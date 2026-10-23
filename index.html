@@ -1,0 +1,1526 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0b09">
+<meta name="description" content="96 × 16 LED 跑馬燈點陣編輯器：逐格上色、圖片轉點陣、儲存圖案、匯出 PNG 與 JSON。手機、平板、電腦都能畫。">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%2315120e'/%3E%3Cg fill='%23ffb000'%3E%3Crect x='3' y='3' width='2' height='2'/%3E%3Crect x='7' y='3' width='2' height='2'/%3E%3Crect x='11' y='3' width='2' height='2'/%3E%3Crect x='3' y='7' width='2' height='2'/%3E%3Crect x='11' y='7' width='2' height='2'/%3E%3Crect x='3' y='11' width='2' height='2'/%3E%3Crect x='7' y='11' width='2' height='2'/%3E%3Crect x='11' y='11' width='2' height='2'/%3E%3C/g%3E%3C/svg%3E">
+<title>96 × 16 跑馬燈點陣編輯器</title>
+<style>
+  :root{
+    --panel-bg:#15120e;
+    --led-off:#2b241b;
+    --led-on:#ffb000;
+    --chrome:#211c16;
+    --chrome-hi:#2e271e;
+    --ink:#efe7db;
+    --ink-dim:#9a8e7d;
+    --edge:#3b3226;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:#0d0b09;color:var(--ink);
+    font-family:"Helvetica Neue",Helvetica,"Noto Sans TC","PingFang TC",sans-serif;
+    font-size:15px;line-height:1.6;
+    padding:24px max(18px, env(safe-area-inset-right)) 60px max(18px, env(safe-area-inset-left));
+  }
+  .wrap{max-width:1240px;margin:0 auto}
+
+  header{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+  h1{font-size:20px;font-weight:600;margin:0}
+  .dims{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    color:var(--led-on);font-size:14px;
+    border:1px solid var(--edge);border-radius:3px;padding:2px 8px;
+  }
+  header .spacer{flex:1}
+  header a{color:var(--ink-dim);font-size:13px}
+
+  .board{
+    position:relative;
+    background:var(--panel-bg);border:6px solid #000;border-radius:6px;
+    padding:10px;overflow-x:auto;overflow-y:hidden;
+    -webkit-overflow-scrolling:touch;
+  }
+  canvas#board{
+    display:block;touch-action:none;cursor:crosshair;
+    -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+  }
+
+  .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+  .bar:first-of-type{margin-top:16px}
+  .group{
+    display:flex;gap:4px;align-items:center;flex-wrap:wrap;
+    background:var(--chrome);border:1px solid var(--edge);
+    border-radius:5px;padding:4px;
+  }
+  .group > .tag{color:var(--ink-dim);font-size:13px;padding:0 6px}
+  button{
+    font:inherit;font-size:14px;color:var(--ink);
+    background:var(--chrome-hi);border:1px solid var(--edge);
+    border-radius:4px;padding:6px 12px;cursor:pointer;
+    touch-action:manipulation;
+  }
+  button:hover{background:#3a3226}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button:focus-visible{outline:2px solid var(--led-on);outline-offset:2px}
+  button[aria-pressed="true"]{background:var(--led-on);color:#1a1409;border-color:var(--led-on);font-weight:600}
+  button.primary{background:var(--led-on);color:#1a1409;border-color:var(--led-on);font-weight:600}
+  button.small{padding:4px 8px;font-size:13px}
+  .arrows button{padding:6px 10px;min-width:38px}
+  input[type=range]{width:118px;accent-color:var(--led-on)}
+  input[type=color]{
+    width:34px;height:30px;padding:0;border:1px solid var(--edge);
+    border-radius:4px;background:none;cursor:pointer;
+  }
+  input[type=checkbox]{accent-color:var(--led-on)}
+  input[type=text]{
+    font:inherit;font-size:14px;color:var(--ink);background:#141109;
+    border:1px solid var(--edge);border-radius:4px;padding:5px 8px;width:170px;
+  }
+  label{color:var(--ink-dim);font-size:13px;display:flex;align-items:center;gap:5px;cursor:pointer}
+  select{
+    font:inherit;font-size:14px;color:var(--ink);background:var(--chrome-hi);
+    border:1px solid var(--edge);border-radius:4px;padding:5px 8px;
+  }
+
+  .readout{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:13px;color:var(--ink-dim);margin-top:10px;min-height:1.6em;
+  }
+  .readout b{color:var(--led-on);font-weight:600}
+  #status{color:var(--led-on)}
+
+  /* 色票區 */
+  .section{
+    margin-top:22px;padding:16px;
+    background:var(--chrome);border:1px solid var(--edge);border-radius:6px;
+  }
+  .section h2{font-size:16px;margin:0 0 4px;font-weight:600}
+  .section p.hint{margin:0 0 12px;color:var(--ink-dim);font-size:13px}
+
+  #swatches{display:flex;flex-wrap:wrap;gap:8px}
+  .swatch{
+    display:flex;align-items:center;gap:8px;
+    background:var(--chrome-hi);border:1px solid var(--edge);
+    border-radius:5px;padding:5px 9px 5px 5px;cursor:pointer;
+  }
+  .swatch:hover{background:#3a3226}
+  .swatch .chip{width:26px;height:26px;border-radius:3px;border:1px solid #000}
+  .swatch .code{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:13px;color:var(--ink);
+  }
+  .swatch .count{font-size:12px;color:var(--ink-dim)}
+
+  /* 圖案清單 */
+  #patternList{display:flex;flex-direction:column;gap:10px}
+  .pattern{
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    background:var(--chrome-hi);border:1px solid var(--edge);
+    border-radius:5px;padding:8px 10px;
+  }
+  .pattern canvas{background:var(--panel-bg);border:2px solid #000;border-radius:3px;display:block;max-width:100%}
+  .pattern .name{font-weight:600;font-size:14px}
+  .pattern .meta{
+    font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--ink-dim);
+  }
+  .pattern .spacer{flex:1}
+  .empty{color:var(--ink-dim);font-size:13px}
+
+  #importPanel{display:none}
+  #importPanel.open{display:block}
+  .stage{background:#0d0b09;border:1px solid var(--edge);border-radius:4px;padding:10px;overflow:auto}
+  canvas#srcCanvas{display:block;touch-action:none;cursor:crosshair;max-width:100%;height:auto}
+  .previewRow{display:flex;align-items:center;gap:14px;margin-top:14px;flex-wrap:wrap}
+  .previewRow .tag{color:var(--ink-dim);font-size:13px}
+  canvas#cropPreview{
+    display:block;background:var(--panel-bg);
+    border:3px solid #000;border-radius:4px;max-width:100%;height:auto;
+  }
+
+  .note{
+    margin-top:26px;padding-top:18px;border-top:1px solid var(--edge);
+    color:var(--ink-dim);font-size:14px;max-width:72ch;
+  }
+  .note h2{font-size:15px;color:var(--ink);margin:0 0 8px;font-weight:600}
+  .note code{font-family:ui-monospace,Menlo,monospace;color:var(--led-on);font-size:13px}
+  .note ul{padding-left:1.2em;margin:0}
+  .note li{margin-bottom:4px}
+  .footer{
+    margin-top:26px;padding-top:14px;border-top:1px solid var(--edge);
+    color:var(--ink-dim);font-size:13px;overflow-wrap:anywhere;
+  }
+  .footer a{color:var(--led-on)}
+  .only-touch{display:none}
+
+  /* 觸控裝置：按鈕放大，手指比較好按 */
+  @media (pointer:coarse){
+    button{min-height:40px;padding:8px 12px}
+    button.small{min-height:36px}
+    input[type=color]{width:42px;height:40px}
+    input[type=range]{width:140px}
+    .only-touch{display:inline}
+    .only-mouse{display:none}
+  }
+
+  /* 手機：縮小外框留白，讓燈板盡量大 */
+  @media (max-width:640px){
+    body{padding-top:14px;padding-left:max(10px, env(safe-area-inset-left));padding-right:max(10px, env(safe-area-inset-right))}
+    header{margin-bottom:12px}
+    h1{font-size:18px}
+    .board{border-width:3px;padding:5px}
+    .bar{gap:6px}
+    .group{flex:1 1 auto}
+    input[type=text]{flex:1 1 140px;width:auto;font-size:16px}
+    select{font-size:16px;max-width:100%}
+    .section{padding:12px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>跑馬燈點陣編輯器</h1>
+    <span class="dims">96 × 16</span>
+    <span class="spacer"></span>
+    <a href="https://github.com/piiinpiiins/led-pixel-editor" target="_blank" rel="noopener">GitHub</a>
+  </header>
+
+  <div class="board" id="boardWrap"><canvas id="board"></canvas></div>
+
+  <div class="readout">游標位置：<span id="pos">—</span>　亮起的點：<b id="lit">0</b> / 1536　<span id="status"></span></div>
+
+  <div class="bar">
+    <div class="group">
+      <span class="tag">工具</span>
+      <button id="toolPen" aria-pressed="true">畫筆</button>
+      <button id="toolEraser" aria-pressed="false">橡皮擦</button>
+      <button id="toolPicker" aria-pressed="false">滴管</button>
+      <button id="toolSelect" aria-pressed="false">圈選</button>
+    </div>
+    <div class="group arrows">
+      <span class="tag">平移</span>
+      <button data-shift="left" title="向左平移" aria-label="向左平移">←</button>
+      <button data-shift="right" title="向右平移" aria-label="向右平移">→</button>
+      <button data-shift="up" title="向上平移" aria-label="向上平移">↑</button>
+      <button data-shift="down" title="向下平移" aria-label="向下平移">↓</button>
+    </div>
+    <div class="group">
+      <button id="btnUndo" title="Ctrl / ⌘ + Z">復原</button>
+      <button id="btnInvert">反相</button>
+      <button id="btnClear">全部清除</button>
+    </div>
+  </div>
+
+  <div class="bar">
+    <div class="group">
+      <label for="zoom">格子大小</label>
+      <button id="zoomOut" class="small" aria-label="縮小">−</button>
+      <input type="range" id="zoom" min="3" max="24" value="10" step="0.5">
+      <button id="zoomIn" class="small" aria-label="放大">＋</button>
+      <span class="tag" id="zoomVal">10 px</span>
+      <button id="zoomFit" class="small">符合寬度</button>
+    </div>
+    <div class="group">
+      <label for="ledColor">畫筆顏色</label>
+      <input type="color" id="ledColor" value="#ffb000">
+      <span class="tag" id="penHex">#ffb000</span>
+      <button id="btnScreenPick" class="small" title="用系統滴管吸取畫面上任何地方的顏色">畫面吸色</button>
+    </div>
+    <div class="group">
+      <button id="btnRecolor">把亮的點全部改成畫筆顏色</button>
+    </div>
+  </div>
+
+  <div class="bar">
+    <div class="group">
+      <span class="tag">圖片</span>
+      <button id="btnImport">匯入圖片</button>
+      <input type="file" id="imageInput" accept="image/*" hidden>
+    </div>
+    <div class="group">
+      <span class="tag">匯出</span>
+      <button id="btnPng1">下載圖片 1 倍</button>
+      <button id="btnPng10">下載圖片 10 倍</button>
+      <button id="btnJson">儲存 JSON</button>
+    </div>
+    <div class="group">
+      <button id="btnLoad">讀取 JSON</button>
+      <input type="file" id="fileInput" accept="application/json,.json" hidden>
+      <button id="btnDefault">載入預設作品</button>
+    </div>
+  </div>
+
+  <!-- ===== 選取與圖案 ===== -->
+  <section class="section">
+    <h2>圖案</h2>
+    <p class="hint">
+      <span class="only-mouse">按住 Shift 鍵（或切換到「圈選」工具）</span><span class="only-touch">切換到「圈選」工具後</span>，在燈板上拖曳可以圈選一塊長方形範圍，取好名字後就能存成圖案，之後隨時貼回燈板任何位置。
+    </p>
+
+    <div class="bar" style="margin-top:0">
+      <div class="group">
+        <span class="tag" id="selInfo">尚未圈選</span>
+        <input type="text" id="patternName" placeholder="圖案名稱" disabled>
+        <button id="btnSavePattern" disabled>儲存為圖案</button>
+        <button id="btnClearSel" disabled>取消圈選</button>
+      </div>
+    </div>
+
+    <div id="patternList" style="margin-top:12px">
+      <p class="empty">還沒有任何圖案。</p>
+    </div>
+  </section>
+
+  <!-- ===== 用過的顏色 ===== -->
+  <section class="section">
+    <h2>這張圖用到的顏色</h2>
+    <p class="hint">點一下色票就會把它設成目前的畫筆顏色。括號裡是使用到的格數。</p>
+    <div id="swatches"><p class="empty">燈板上還沒有亮起的點。</p></div>
+  </section>
+
+  <!-- ===== 匯入圖片 ===== -->
+  <section class="section" id="importPanel" aria-label="圖片轉點陣">
+    <h2>框選要轉成點陣的範圍</h2>
+    <p class="hint">在圖片上拖曳可以畫出新的選取框，框內拖曳是移動，四個角落拖曳是縮放。預設鎖定 6：1 的比例，跟燈板一樣。</p>
+
+    <div class="stage"><canvas id="srcCanvas"></canvas></div>
+
+    <div class="bar">
+      <div class="group">
+        <label><input type="checkbox" id="lockRatio" checked> 鎖定 6：1 比例</label>
+      </div>
+      <div class="group">
+        <label for="mapMode">轉換方式</label>
+        <select id="mapMode">
+          <option value="mono">單色（全部用畫筆顏色）</option>
+          <option value="color">彩色（保留每一格的顏色）</option>
+        </select>
+      </div>
+      <div class="group">
+        <label for="threshold">亮度門檻</label>
+        <input type="range" id="threshold" min="0" max="255" value="128">
+        <span class="tag" id="thresholdVal">128</span>
+      </div>
+      <div class="group">
+        <label><input type="checkbox" id="invertSrc"> 明暗反轉</label>
+        <label><input type="checkbox" id="dither"> 抖色</label>
+      </div>
+    </div>
+
+    <div class="previewRow">
+      <span class="tag">轉換結果預覽</span>
+      <canvas id="cropPreview"></canvas>
+    </div>
+
+    <div class="bar">
+      <button id="btnApply" class="primary">套用到燈板</button>
+      <button id="btnResetCrop">重設選取範圍</button>
+      <button id="btnCancelImport">取消</button>
+    </div>
+  </section>
+
+  <div class="note">
+    <h2>幾件值得知道的事</h2>
+    <ul>
+      <li><b>電腦</b>：左鍵拖曳連續塗畫，右鍵拖曳一律擦除，Shift 加拖曳是圈選，Ctrl / ⌘ + Z 復原。</li>
+      <li><b>手機、平板</b>：單指塗畫；雙指拖曳可以左右移動燈板，雙指開合可以放大縮小。要擦除或圈選，請先切換工具。</li>
+      <li>每一格都會記住自己的色碼，所以同一張圖上可以有很多種顏色。</li>
+      <li>第一次打開會顯示預設作品，想從空白開始就按「全部清除」，想回到預設作品就按「載入預設作品」。之後作品會自動暫存在這個瀏覽器裡，重新整理頁面也不會不見；但要換裝置或長期保存，請用「儲存 JSON」。</li>
+      <li>「畫面吸色」用的是瀏覽器的 EyeDropper 介面，目前只有部分電腦版瀏覽器支援；燈板上的「滴管」工具則是到處都能用。</li>
+      <li>JSON 檔名會自動加上年月日時分秒，例如 <code>marquee-96x16-20260904-131500.json</code>。</li>
+      <li>96 × 16 只有 1536 個點，照片一定會失去細節。線條清楚、對比強烈的圖案效果最好，照片建議打開「抖色」。</li>
+    </ul>
+  </div>
+
+  <footer class="footer">
+    原始碼：<a href="https://github.com/piiinpiiins/led-pixel-editor" target="_blank" rel="noopener">https://github.com/piiinpiiins/led-pixel-editor</a>
+  </footer>
+
+</div>
+
+<script>
+/* ============================================================
+   第一部分：基本設定與資料結構
+   ============================================================ */
+
+const COLS = 96;
+const ROWS = 16;
+const TOTAL = COLS * ROWS;
+const ASPECT = COLS / ROWS;          // 等於 6，選取框鎖定比例時要用
+const STORAGE_KEY = 'led-marquee-96x16-autosave';
+
+const ZOOM_MIN = 3;
+const ZOOM_MAX = 24;
+
+// pixels 記錄每一格亮不亮，0 是熄滅、1 是亮起。
+// colors 記錄每一格自己的色碼字串，熄滅的格子是 null。
+// 第 (x, y) 格都放在陣列的第 (y * COLS + x) 個位置。
+let pixels = new Uint8Array(TOTAL);
+let colors = new Array(TOTAL).fill(null);
+
+const undoStack = [];
+const UNDO_LIMIT = 40;
+
+let cellSize = 10;
+let userZoomed = false;            // 使用者自己調過縮放，就不再自動符合寬度
+let penColor = '#ffb000';
+let tool = 'pen';                  // 'pen'、'eraser'、'picker' 或 'select'
+
+let painting = false;
+let paintValue = 1;
+let lastCell = null;               // 上一個塗到的格子，用來補畫中間跳過的格子
+
+let selection = null;              // 圈選範圍 {x, y, w, h}，單位是格
+let selecting = false;
+let selAnchor = null;
+
+let patterns = [];                 // 存起來的圖案
+let pastingPattern = null;         // 正在等待放置的圖案
+
+const boardWrap = document.getElementById('boardWrap');
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+const statusEl = document.getElementById('status');
+
+function setStatus(text) { statusEl.textContent = text; }
+
+
+/* ============================================================
+   第二部分：把資料畫到燈板上
+   ============================================================ */
+
+function resizeCanvas() {
+  const ratio = window.devicePixelRatio || 1;
+  const w = COLS * cellSize;
+  const h = ROWS * cellSize;
+  canvas.style.width  = w + 'px';
+  canvas.style.height = h + 'px';
+  canvas.width  = Math.round(w * ratio);
+  canvas.height = Math.round(h * ratio);
+  draw();
+}
+
+// 直接用裝置像素畫，格子大小可以是小數也不會出現模糊的接縫。
+function draw() {
+  const ratio = window.devicePixelRatio || 1;
+  const unit = cellSize * ratio;
+  const gap = cellSize >= 9 ? Math.max(1, Math.round(ratio)) : (unit >= 5 ? 1 : 0);
+  const edge = (n) => Math.round(n * unit);
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#15120e';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (let y = 0; y < ROWS; y++) {
+    const top = edge(y), bottom = edge(y + 1) - gap;
+    for (let x = 0; x < COLS; x++) {
+      const i = y * COLS + x;
+      const left = edge(x), right = edge(x + 1) - gap;
+      ctx.fillStyle = pixels[i] ? (colors[i] || penColor) : '#2b241b';
+      ctx.fillRect(left, top, right - left, bottom - top);
+    }
+  }
+
+  // 圈選範圍畫一個白色虛線框
+  if (selection) {
+    ctx.save();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5 * ratio;
+    ctx.setLineDash([4 * ratio, 3 * ratio]);
+    ctx.strokeRect(
+      edge(selection.x) + 0.75 * ratio,
+      edge(selection.y) + 0.75 * ratio,
+      edge(selection.x + selection.w) - edge(selection.x) - 1.5 * ratio,
+      edge(selection.y + selection.h) - edge(selection.y) - 1.5 * ratio
+    );
+    ctx.restore();
+  }
+
+  updateReadout();
+}
+
+function updateReadout() {
+  let count = 0;
+  for (let i = 0; i < TOTAL; i++) if (pixels[i]) count++;
+  document.getElementById('lit').textContent = count;
+}
+
+// 連續塗畫時每一格都重畫會很慢，所以合併到下一個畫面更新時再一起畫。
+let renderQueued = false;
+function requestRender() {
+  if (renderQueued) return;
+  renderQueued = true;
+  requestAnimationFrame(() => {
+    renderQueued = false;
+    draw();
+    renderSwatches();
+    scheduleAutosave();
+  });
+}
+
+
+/* ============================================================
+   第三部分：縮放與符合寬度
+   ============================================================ */
+
+const zoomInput = document.getElementById('zoom');
+
+function clampZoom(v) { return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, v)); }
+
+function setZoom(value) {
+  cellSize = Math.round(clampZoom(value) * 100) / 100;
+  zoomInput.value = cellSize;
+  document.getElementById('zoomVal').textContent =
+    (Number.isInteger(cellSize) ? cellSize : cellSize.toFixed(1)) + ' px';
+  resizeCanvas();
+}
+
+// 讓整片燈板剛好塞進螢幕寬度。
+function fitWidth() {
+  const style = getComputedStyle(boardWrap);
+  const inner = boardWrap.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  if (inner <= 0) return;            // 版面還沒排好（例如分頁在背景），等尺寸變化時再算
+  setZoom(Math.min(12, Math.floor((inner / COLS) * 10) / 10));
+}
+
+zoomInput.addEventListener('input', (event) => {
+  userZoomed = true;
+  setZoom(Number(event.target.value));
+});
+document.getElementById('zoomIn').addEventListener('click', () => { userZoomed = true; setZoom(cellSize + 1); });
+document.getElementById('zoomOut').addEventListener('click', () => { userZoomed = true; setZoom(cellSize - 1); });
+document.getElementById('zoomFit').addEventListener('click', () => { userZoomed = false; fitWidth(); });
+
+// 燈板外框寬度改變（轉向、調整視窗大小）時，重新符合寬度。
+// 外框寬度不受畫布影響，所以不會互相觸發。
+let lastWrapWidth = 0;
+new ResizeObserver(() => {
+  if (boardWrap.clientWidth === lastWrapWidth) return;
+  lastWrapWidth = boardWrap.clientWidth;
+  if (!userZoomed) fitWidth();
+}).observe(boardWrap);
+
+// 拖到另一個螢幕、或瀏覽器縮放時，像素密度會變，畫布要重建。
+window.addEventListener('resize', () => resizeCanvas());
+
+
+/* ============================================================
+   第四部分：燈板上的滑鼠與手指操作
+   ============================================================ */
+
+function eventToCell(event) {
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((event.clientX - rect.left) / cellSize);
+  const y = Math.floor((event.clientY - rect.top)  / cellSize);
+  if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return null;
+  return { x, y, index: y * COLS + x };
+}
+
+function setCell(x, y, value) {
+  const i = y * COLS + x;
+  pixels[i] = value;
+  // 亮起就記下目前的畫筆顏色，熄滅就把顏色一起清掉。
+  colors[i] = value ? penColor : null;
+}
+
+// 手指或滑鼠移動很快時，兩次事件之間可能跳過好幾格，
+// 這裡用 Bresenham 直線演算法把中間的格子補起來。
+function paintTo(cell, value) {
+  if (!cell) return;
+  if (lastCell && lastCell.index === cell.index) return;
+  if (!lastCell) {
+    setCell(cell.x, cell.y, value);
+  } else {
+    let x0 = lastCell.x, y0 = lastCell.y;
+    const x1 = cell.x, y1 = cell.y;
+    const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0);
+    const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+    let err = dx + dy;
+    while (true) {
+      setCell(x0, y0, value);
+      if (x0 === x1 && y0 === y1) break;
+      const e2 = 2 * err;
+      if (e2 >= dy) { err += dy; x0 += sx; }
+      if (e2 <= dx) { err += dx; y0 += sy; }
+    }
+  }
+  lastCell = cell;
+  requestRender();
+}
+
+function updateSelectionTo(cell) {
+  selection = {
+    x: Math.min(selAnchor.x, cell.x),
+    y: Math.min(selAnchor.y, cell.y),
+    w: Math.abs(cell.x - selAnchor.x) + 1,
+    h: Math.abs(cell.y - selAnchor.y) + 1
+  };
+  updateSelectionUI();
+  draw();
+}
+
+// 記錄目前按在燈板上的每一根手指（或滑鼠），兩根以上就是平移／縮放手勢。
+const pointers = new Map();
+let gesture = null;          // 雙指手勢進行中的起始資料
+let gestureLock = false;     // 手勢結束前，剩下的那根手指不再塗畫
+
+function midpoint() {
+  const [a, b] = [...pointers.values()];
+  return {
+    x: (a.x + b.x) / 2,
+    y: (a.y + b.y) / 2,
+    dist: Math.hypot(a.x - b.x, a.y - b.y) || 1
+  };
+}
+
+function startGesture() {
+  // 第一根手指可能已經塗了一兩格，雙指手勢開始時把那一筆收回來。
+  if (painting) {
+    const snapshot = undoStack.pop();
+    if (snapshot) { pixels = snapshot.p; colors = snapshot.c; requestRender(); }
+  }
+  painting = false;
+  selecting = false;
+  lastCell = null;
+  gestureLock = true;
+
+  const m = midpoint();
+  const rect = boardWrap.getBoundingClientRect();
+  const viewX = m.x - rect.left - boardWrap.clientLeft;
+  gesture = {
+    startCell: cellSize,
+    startDist: m.dist,
+    startMidX: m.x,
+    // 手勢中心點對準的是燈板上第幾格（可以是小數），縮放時讓這一格維持在手指底下
+    anchor: (viewX + boardWrap.scrollLeft - canvas.offsetLeft) / cellSize
+  };
+}
+
+function moveGesture() {
+  const m = midpoint();
+  const next = clampZoom(gesture.startCell * (m.dist / gesture.startDist));
+  if (Math.abs(next - cellSize) > 0.05) {
+    userZoomed = true;
+    setZoom(next);
+  }
+  const rect = boardWrap.getBoundingClientRect();
+  const viewX = m.x - rect.left - boardWrap.clientLeft;
+  boardWrap.scrollLeft = gesture.anchor * cellSize + canvas.offsetLeft - viewX;
+}
+
+canvas.addEventListener('pointerdown', (event) => {
+  pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  try { canvas.setPointerCapture(event.pointerId); } catch (err) {}
+  event.preventDefault();
+
+  if (pointers.size === 2) { startGesture(); return; }
+  if (pointers.size > 2 || gestureLock) return;
+
+  const cell = eventToCell(event);
+  if (!cell) return;
+
+  // 情況一：正在等待放置圖案
+  if (pastingPattern) {
+    placePattern(pastingPattern, cell.x, cell.y);
+    pastingPattern = null;
+    setStatus('');
+    return;
+  }
+
+  // 情況二：按住 Shift 或使用圈選工具
+  if (event.shiftKey || tool === 'select') {
+    selecting = true;
+    selAnchor = { x: cell.x, y: cell.y };
+    updateSelectionTo(cell);
+    return;
+  }
+
+  // 情況三：滴管，把這一格的顏色設成畫筆顏色
+  if (tool === 'picker') {
+    if (pixels[cell.index]) setPenColor(colors[cell.index] || penColor);
+    return;
+  }
+
+  // 情況四：一般塗畫
+  pushUndo();
+  paintValue = (event.button === 2 || tool === 'eraser') ? 0 : 1;
+  painting = true;
+  lastCell = null;
+  paintTo(cell, paintValue);
+});
+
+canvas.addEventListener('pointermove', (event) => {
+  if (pointers.has(event.pointerId)) {
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  }
+
+  if (gesture && pointers.size >= 2) { moveGesture(); return; }
+
+  const cell = eventToCell(event);
+  document.getElementById('pos').textContent = cell ? `${cell.x}, ${cell.y}` : '—';
+
+  if (gestureLock) return;
+  if (selecting && cell) { updateSelectionTo(cell); return; }
+  if (painting) paintTo(cell, paintValue);
+});
+
+function endPointer(event) {
+  pointers.delete(event.pointerId);
+  if (pointers.size < 2) gesture = null;
+  if (pointers.size === 0) {
+    gestureLock = false;
+    painting = false;
+    selecting = false;
+    lastCell = null;
+  }
+}
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('pointerleave', (event) => {
+  if (event.pointerType === 'mouse') document.getElementById('pos').textContent = '—';
+});
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+
+/* ============================================================
+   第五部分：復原、清除、反相、平移、換色
+   ============================================================ */
+
+function pushUndo() {
+  undoStack.push({ p: pixels.slice(), c: colors.slice() });
+  if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+}
+
+function refreshAll() { draw(); renderSwatches(); scheduleAutosave(); }
+
+function undo() {
+  const snapshot = undoStack.pop();
+  if (!snapshot) { setStatus('沒有可以復原的步驟了'); return; }
+  pixels = snapshot.p;
+  colors = snapshot.c;
+  refreshAll();
+}
+document.getElementById('btnUndo').addEventListener('click', undo);
+
+document.getElementById('btnClear').addEventListener('click', () => {
+  pushUndo();
+  pixels = new Uint8Array(TOTAL);
+  colors = new Array(TOTAL).fill(null);
+  refreshAll();
+  setStatus('已全部清除，按「復原」可以找回來');
+});
+
+document.getElementById('btnInvert').addEventListener('click', () => {
+  pushUndo();
+  for (let i = 0; i < TOTAL; i++) {
+    const on = pixels[i] ? 0 : 1;
+    pixels[i] = on;
+    colors[i] = on ? penColor : null;   // 本來暗的格子被點亮，就用目前的畫筆顏色
+  }
+  refreshAll();
+});
+
+document.getElementById('btnRecolor').addEventListener('click', () => {
+  pushUndo();
+  for (let i = 0; i < TOTAL; i++) if (pixels[i]) colors[i] = penColor;
+  refreshAll();
+});
+
+function shift(direction) {
+  pushUndo();
+  const nextPixels = new Uint8Array(TOTAL);
+  const nextColors = new Array(TOTAL).fill(null);
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      let nx = x, ny = y;
+      if (direction === 'left')  nx = (x - 1 + COLS) % COLS;
+      if (direction === 'right') nx = (x + 1) % COLS;
+      if (direction === 'up')    ny = (y - 1 + ROWS) % ROWS;
+      if (direction === 'down')  ny = (y + 1) % ROWS;
+      nextPixels[ny * COLS + nx] = pixels[y * COLS + x];
+      nextColors[ny * COLS + nx] = colors[y * COLS + x];
+    }
+  }
+  pixels = nextPixels;
+  colors = nextColors;
+  refreshAll();
+}
+
+document.querySelectorAll('[data-shift]').forEach((button) => {
+  button.addEventListener('click', () => shift(button.dataset.shift));
+});
+
+
+/* ============================================================
+   第六部分：工具、畫筆顏色、滴管、快捷鍵
+   ============================================================ */
+
+const toolButtons = {
+  pen:    document.getElementById('toolPen'),
+  eraser: document.getElementById('toolEraser'),
+  picker: document.getElementById('toolPicker'),
+  select: document.getElementById('toolSelect')
+};
+
+const toolHints = {
+  picker: '滴管：點一下燈板上亮起的點就會吸取它的顏色',
+  select: '圈選：在燈板上拖曳出範圍，再到下方「圖案」區存成圖案'
+};
+
+function setTool(name) {
+  tool = name;
+  for (const key in toolButtons) {
+    toolButtons[key].setAttribute('aria-pressed', key === name);
+  }
+  setStatus(toolHints[name] || '');
+}
+for (const key in toolButtons) {
+  toolButtons[key].addEventListener('click', () => setTool(key));
+}
+
+const colorInput = document.getElementById('ledColor');
+const penHexLabel = document.getElementById('penHex');
+
+function setPenColor(hex) {
+  penColor = normalizeHex(hex);
+  colorInput.value = penColor;
+  penHexLabel.textContent = penColor;
+  draw();
+  scheduleAutosave();
+}
+
+// 統一成 "#000000" 這種六位十六進位的寫法。
+function normalizeHex(hex) {
+  if (typeof hex !== 'string') return '#ffb000';
+  let h = hex.trim().toLowerCase();
+  if (h[0] !== '#') h = '#' + h;
+  if (h.length === 4) h = '#' + h[1] + h[1] + h[2] + h[2] + h[3] + h[3];  // #abc 展開成 #aabbcc
+  return /^#[0-9a-f]{6}$/.test(h) ? h : '#ffb000';
+}
+
+colorInput.addEventListener('input', (event) => setPenColor(event.target.value));
+
+// 系統滴管：可以吸取整個畫面上任何地方的顏色，但不是每個瀏覽器都支援。
+const screenPickButton = document.getElementById('btnScreenPick');
+if (typeof window.EyeDropper === 'undefined') {
+  screenPickButton.disabled = true;
+  screenPickButton.title = '這個瀏覽器不支援系統滴管，請改用工具列上的「滴管」';
+} else {
+  screenPickButton.addEventListener('click', async () => {
+    try {
+      const result = await new window.EyeDropper().open();
+      setPenColor(result.sRGBHex);
+    } catch (err) {
+      // 使用者按 Esc 取消，不需要做任何事
+    }
+  });
+}
+
+// 鍵盤快捷鍵：Ctrl/⌘+Z 復原，B 畫筆、E 橡皮擦、I 滴管、S 圈選。
+document.addEventListener('keydown', (event) => {
+  const tag = (event.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+    event.preventDefault();
+    undo();
+    return;
+  }
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  const map = { b: 'pen', e: 'eraser', i: 'picker', s: 'select' };
+  const name = map[event.key.toLowerCase()];
+  if (name) setTool(name);
+  if (event.key === 'Escape' && pastingPattern) { pastingPattern = null; setStatus(''); }
+});
+
+
+/* ============================================================
+   第七部分：色票清單
+   ============================================================ */
+
+// 掃過所有亮起的格子，統計每個色碼被用了幾格，再產生色票。
+function renderSwatches() {
+  const box = document.getElementById('swatches');
+  const sorted = usedColors();
+
+  if (sorted.length === 0) {
+    box.innerHTML = '<p class="empty">燈板上還沒有亮起的點。</p>';
+    return;
+  }
+
+  box.innerHTML = '';
+  sorted.forEach(({ hex, count }) => {
+    const item = document.createElement('button');
+    item.className = 'swatch';
+    item.title = '設為畫筆顏色';
+    item.innerHTML =
+      `<span class="chip" style="background:${hex}"></span>` +
+      `<span class="code">${hex}</span>` +
+      `<span class="count">${count} 格</span>`;
+    item.addEventListener('click', () => setPenColor(hex));
+    box.appendChild(item);
+  });
+}
+
+// 統計用到哪些顏色，由多到少排序；色票區和 JSON 的 palette 欄位都用它。
+function usedColors() {
+  const tally = new Map();
+  for (let i = 0; i < TOTAL; i++) {
+    if (!pixels[i]) continue;
+    const hex = colors[i] || penColor;
+    tally.set(hex, (tally.get(hex) || 0) + 1);
+  }
+  return [...tally.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([hex, count]) => ({ hex, count }));
+}
+
+
+/* ============================================================
+   第八部分：圈選與圖案
+   ============================================================ */
+
+const patternNameInput = document.getElementById('patternName');
+const savePatternButton = document.getElementById('btnSavePattern');
+const clearSelButton = document.getElementById('btnClearSel');
+
+function updateSelectionUI() {
+  const info = document.getElementById('selInfo');
+  const has = selection !== null;
+  info.textContent = has
+    ? `已圈選 ${selection.w} × ${selection.h}（左上角 ${selection.x}, ${selection.y}）`
+    : '尚未圈選';
+  patternNameInput.disabled = !has;
+  savePatternButton.disabled = !has;
+  clearSelButton.disabled = !has;
+}
+
+clearSelButton.addEventListener('click', () => {
+  selection = null;
+  updateSelectionUI();
+  draw();
+});
+
+savePatternButton.addEventListener('click', () => {
+  if (!selection) return;
+  const name = patternNameInput.value.trim() || `圖案 ${patterns.length + 1}`;
+
+  // 把圈選範圍裡的每一格複製出來，亮的存色碼、暗的存 null。
+  const cells = [];
+  for (let y = 0; y < selection.h; y++) {
+    const row = [];
+    for (let x = 0; x < selection.w; x++) {
+      const i = (selection.y + y) * COLS + (selection.x + x);
+      row.push(pixels[i] ? (colors[i] || penColor) : null);
+    }
+    cells.push(row);
+  }
+
+  patterns.push({ name, w: selection.w, h: selection.h, cells });
+  patternNameInput.value = '';
+  renderPatterns();
+  scheduleAutosave();
+  setStatus(`已存成圖案「${name}」`);
+});
+
+// 把一個圖案貼到燈板上，(ox, oy) 是它左上角要放的位置。
+function placePattern(pattern, ox, oy) {
+  pushUndo();
+  for (let y = 0; y < pattern.h; y++) {
+    for (let x = 0; x < pattern.w; x++) {
+      const hex = pattern.cells[y][x];
+      if (!hex) continue;                       // 圖案裡原本是暗的格子就跳過，不會蓋掉底下的圖
+      const tx = ox + x, ty = oy + y;
+      if (tx < 0 || tx >= COLS || ty < 0 || ty >= ROWS) continue;   // 超出燈板就不畫
+      const i = ty * COLS + tx;
+      pixels[i] = 1;
+      colors[i] = hex;
+    }
+  }
+  refreshAll();
+}
+
+// 產生一個圖案的縮圖。
+function patternThumb(pattern) {
+  const s = 4;
+  const c = document.createElement('canvas');
+  c.width = pattern.w * s;
+  c.height = pattern.h * s;
+  const g = c.getContext('2d');
+  g.fillStyle = '#15120e';
+  g.fillRect(0, 0, c.width, c.height);
+  for (let y = 0; y < pattern.h; y++) {
+    for (let x = 0; x < pattern.w; x++) {
+      const hex = pattern.cells[y][x];
+      if (!hex) continue;
+      g.fillStyle = hex;
+      g.fillRect(x * s, y * s, s, s);
+    }
+  }
+  return c;
+}
+
+function renderPatterns() {
+  const list = document.getElementById('patternList');
+  if (patterns.length === 0) {
+    list.innerHTML = '<p class="empty">還沒有任何圖案。</p>';
+    return;
+  }
+
+  list.innerHTML = '';
+  patterns.forEach((pattern, index) => {
+    const row = document.createElement('div');
+    row.className = 'pattern';
+
+    row.appendChild(patternThumb(pattern));
+
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = pattern.name;
+    row.appendChild(name);
+
+    const meta = document.createElement('span');
+    meta.className = 'meta';
+    meta.textContent = `${pattern.w} × ${pattern.h}`;
+    row.appendChild(meta);
+
+    const spacer = document.createElement('span');
+    spacer.className = 'spacer';
+    row.appendChild(spacer);
+
+    const pasteButton = document.createElement('button');
+    pasteButton.className = 'small';
+    pasteButton.textContent = '貼上';
+    pasteButton.addEventListener('click', () => {
+      pastingPattern = pattern;
+      setStatus(`貼上模式：點一下燈板決定「${pattern.name}」左上角的位置`);
+      canvas.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    row.appendChild(pasteButton);
+
+    const renameButton = document.createElement('button');
+    renameButton.className = 'small';
+    renameButton.textContent = '改名';
+    renameButton.addEventListener('click', () => {
+      const newName = prompt('新的圖案名稱', pattern.name);
+      if (newName && newName.trim()) {
+        pattern.name = newName.trim();
+        renderPatterns();
+        scheduleAutosave();
+      }
+    });
+    row.appendChild(renameButton);
+
+    const deleteButton = document.createElement('button');
+    deleteButton.className = 'small';
+    deleteButton.textContent = '刪除';
+    deleteButton.addEventListener('click', () => {
+      if (!confirm(`確定要刪除圖案「${pattern.name}」嗎？`)) return;
+      patterns.splice(index, 1);
+      renderPatterns();
+      scheduleAutosave();
+    });
+    row.appendChild(deleteButton);
+
+    list.appendChild(row);
+  });
+}
+
+
+/* ============================================================
+   第九部分：匯入圖片、框選範圍、轉成點陣
+   ============================================================ */
+
+const importPanel   = document.getElementById('importPanel');
+const srcCanvas     = document.getElementById('srcCanvas');
+const srcCtx        = srcCanvas.getContext('2d');
+const previewCanvas = document.getElementById('cropPreview');
+const previewCtx    = previewCanvas.getContext('2d');
+
+let sourceImage = null;
+let displayScale = 1;
+let crop = null;
+let dragMode = null;
+let dragStart = null;
+
+let pendingPixels = new Uint8Array(TOTAL);
+let pendingColors = new Array(TOTAL).fill(null);
+
+document.getElementById('btnImport').addEventListener('click', () => {
+  document.getElementById('imageInput').click();
+});
+
+document.getElementById('imageInput').addEventListener('change', (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => openImportPanel(img);
+    img.onerror = () => alert('這個檔案沒辦法當成圖片打開。');
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+  event.target.value = '';
+});
+
+function openImportPanel(img) {
+  sourceImage = img;
+  displayScale = Math.min(900 / img.width, 520 / img.height, 1);
+  srcCanvas.width  = Math.round(img.width  * displayScale);
+  srcCanvas.height = Math.round(img.height * displayScale);
+  importPanel.classList.add('open');
+  resetCrop();
+  importPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function resetCrop() {
+  const img = sourceImage;
+  if (!img) return;
+  let w = img.width;
+  let h = w / ASPECT;
+  if (h > img.height) { h = img.height; w = h * ASPECT; }
+  crop = { x: (img.width - w) / 2, y: (img.height - h) / 2, w, h };
+  renderImport();
+}
+
+function toDisplay(v) { return v * displayScale; }
+function toSource(v)  { return v / displayScale; }
+
+// 畫布在手機上會被 CSS 再縮小一次，這個比例用來換算「螢幕上的幾個像素」。
+function cssScale() {
+  const rect = srcCanvas.getBoundingClientRect();
+  return rect.width ? srcCanvas.width / rect.width : 1;
+}
+
+function drawSource() {
+  srcCtx.clearRect(0, 0, srcCanvas.width, srcCanvas.height);
+  srcCtx.drawImage(sourceImage, 0, 0, srcCanvas.width, srcCanvas.height);
+
+  const dx = toDisplay(crop.x), dy = toDisplay(crop.y);
+  const dw = toDisplay(crop.w), dh = toDisplay(crop.h);
+  const k = cssScale();
+
+  srcCtx.fillStyle = 'rgba(0,0,0,0.6)';
+  srcCtx.fillRect(0, 0, srcCanvas.width, dy);
+  srcCtx.fillRect(0, dy + dh, srcCanvas.width, srcCanvas.height - dy - dh);
+  srcCtx.fillRect(0, dy, dx, dh);
+  srcCtx.fillRect(dx + dw, dy, srcCanvas.width - dx - dw, dh);
+
+  srcCtx.strokeStyle = '#ffb000';
+  srcCtx.lineWidth = 2 * k;
+  srcCtx.strokeRect(dx, dy, dw, dh);
+
+  // 控制點在螢幕上維持差不多的大小，手機上也點得到
+  srcCtx.fillStyle = '#ffb000';
+  const s = 10 * k;
+  [[dx, dy], [dx + dw, dy], [dx, dy + dh], [dx + dw, dy + dh]].forEach(([hx, hy]) => {
+    srcCtx.fillRect(hx - s / 2, hy - s / 2, s, s);
+  });
+}
+
+function computePending() {
+  const mode      = document.getElementById('mapMode').value;
+  const threshold = Number(document.getElementById('threshold').value);
+  const invert    = document.getElementById('invertSrc').checked;
+  const useDither = document.getElementById('dither').checked;
+
+  // 把選取範圍直接縮成 96 × 16，瀏覽器縮圖時會自動做區域平均。
+  const small = document.createElement('canvas');
+  small.width = COLS;
+  small.height = ROWS;
+  const sctx = small.getContext('2d', { willReadFrequently: true });
+  sctx.imageSmoothingEnabled = true;
+  sctx.drawImage(sourceImage, crop.x, crop.y, crop.w, crop.h, 0, 0, COLS, ROWS);
+  const data = sctx.getImageData(0, 0, COLS, ROWS).data;
+
+  // 亮度公式，綠色權重最高，因為人眼對綠色最敏感。
+  const lum = new Float32Array(TOTAL);
+  for (let i = 0; i < TOTAL; i++) {
+    const r = data[i * 4], g = data[i * 4 + 1], b = data[i * 4 + 2];
+    let v = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    if (invert) v = 255 - v;
+    lum[i] = v;
+  }
+
+  pendingPixels = new Uint8Array(TOTAL);
+  pendingColors = new Array(TOTAL).fill(null);
+
+  if (useDither) {
+    // Floyd–Steinberg 抖色：把判斷成亮或暗所產生的誤差，
+    // 按比例分給右邊和下面還沒處理的鄰居，灰階層次就會被保留下來。
+    for (let y = 0; y < ROWS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        const i = y * COLS + x;
+        const old = lum[i];
+        const on = old >= threshold ? 1 : 0;
+        pendingPixels[i] = on;
+        const error = old - (on ? 255 : 0);
+        if (x + 1 < COLS)                 lum[i + 1]        += error * 7 / 16;
+        if (x > 0 && y + 1 < ROWS)        lum[i + COLS - 1] += error * 3 / 16;
+        if (y + 1 < ROWS)                 lum[i + COLS]     += error * 5 / 16;
+        if (x + 1 < COLS && y + 1 < ROWS) lum[i + COLS + 1] += error * 1 / 16;
+      }
+    }
+  } else {
+    for (let i = 0; i < TOTAL; i++) pendingPixels[i] = lum[i] >= threshold ? 1 : 0;
+  }
+
+  // 每一格都要有自己的色碼：彩色模式用原圖的顏色，單色模式用畫筆顏色。
+  for (let i = 0; i < TOTAL; i++) {
+    if (!pendingPixels[i]) continue;
+    pendingColors[i] = (mode === 'color')
+      ? rgbToHex(data[i * 4], data[i * 4 + 1], data[i * 4 + 2])
+      : penColor;
+  }
+}
+
+function rgbToHex(r, g, b) {
+  const two = (n) => n.toString(16).padStart(2, '0');
+  return '#' + two(r) + two(g) + two(b);
+}
+
+function drawPreview() {
+  const s = 6;
+  previewCanvas.width  = COLS * s;
+  previewCanvas.height = ROWS * s;
+  previewCtx.fillStyle = '#15120e';
+  previewCtx.fillRect(0, 0, previewCanvas.width, previewCanvas.height);
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      const i = y * COLS + x;
+      previewCtx.fillStyle = pendingPixels[i] ? (pendingColors[i] || penColor) : '#2b241b';
+      previewCtx.fillRect(x * s, y * s, s - 1, s - 1);
+    }
+  }
+}
+
+function renderImport() {
+  if (!sourceImage || !crop) return;
+  drawSource();
+  computePending();
+  drawPreview();
+}
+
+function pointerToSource(event) {
+  const rect = srcCanvas.getBoundingClientRect();
+  const k = srcCanvas.width / rect.width;   // 畫布可能又被 CSS 縮過一次
+  return {
+    x: toSource((event.clientX - rect.left) * k),
+    y: toSource((event.clientY - rect.top)  * k)
+  };
+}
+
+function hitHandle(p, pointerType) {
+  // 手指比滑鼠粗，觸控時把可以點到控制點的範圍放大
+  const near = toSource((pointerType === 'mouse' ? 12 : 24) * cssScale());
+  const corners = {
+    nw: { x: crop.x,          y: crop.y },
+    ne: { x: crop.x + crop.w, y: crop.y },
+    sw: { x: crop.x,          y: crop.y + crop.h },
+    se: { x: crop.x + crop.w, y: crop.y + crop.h }
+  };
+  for (const name in corners) {
+    const c = corners[name];
+    if (Math.abs(p.x - c.x) < near && Math.abs(p.y - c.y) < near) return name;
+  }
+  return null;
+}
+
+srcCanvas.addEventListener('pointerdown', (event) => {
+  if (!sourceImage || dragMode) return;
+  event.preventDefault();
+  srcCanvas.setPointerCapture(event.pointerId);
+  const p = pointerToSource(event);
+
+  const handle = hitHandle(p, event.pointerType);
+  if (handle) {
+    dragMode = handle;
+  } else if (p.x >= crop.x && p.x <= crop.x + crop.w &&
+             p.y >= crop.y && p.y <= crop.y + crop.h) {
+    dragMode = 'move';
+    dragStart = { px: p.x, py: p.y, cx: crop.x, cy: crop.y };
+  } else {
+    dragMode = 'new';
+    dragStart = { px: p.x, py: p.y };
+  }
+});
+
+srcCanvas.addEventListener('pointermove', (event) => {
+  if (!dragMode) return;
+  const p = pointerToSource(event);
+  const lock = document.getElementById('lockRatio').checked;
+
+  if (dragMode === 'move') {
+    crop.x = dragStart.cx + (p.x - dragStart.px);
+    crop.y = dragStart.cy + (p.y - dragStart.py);
+  } else {
+    const fixed = (dragMode === 'new')
+      ? { x: dragStart.px, y: dragStart.py }
+      : { x: dragMode.includes('w') ? crop.x + crop.w : crop.x,
+          y: dragMode.includes('n') ? crop.y + crop.h : crop.y };
+
+    let w = Math.abs(p.x - fixed.x);
+    let h = Math.abs(p.y - fixed.y);
+    if (lock) h = w / ASPECT;
+
+    crop.x = Math.min(fixed.x, p.x);
+    crop.y = (p.y < fixed.y) ? fixed.y - h : fixed.y;
+    crop.w = w;
+    crop.h = h;
+  }
+
+  clampCrop();
+  renderImport();
+});
+
+function endCropDrag() {
+  if (!dragMode) return;
+  const wasNew = dragMode === 'new';
+  dragMode = null;
+  if (wasNew && crop.w < 4) resetCrop();
+}
+srcCanvas.addEventListener('pointerup', endCropDrag);
+srcCanvas.addEventListener('pointercancel', endCropDrag);
+
+function clampCrop() {
+  const img = sourceImage;
+  crop.w = Math.max(4, Math.min(crop.w, img.width));
+  crop.h = Math.max(2, Math.min(crop.h, img.height));
+  crop.x = Math.max(0, Math.min(crop.x, img.width  - crop.w));
+  crop.y = Math.max(0, Math.min(crop.y, img.height - crop.h));
+}
+
+['mapMode', 'threshold', 'invertSrc', 'dither', 'lockRatio'].forEach((id) => {
+  document.getElementById(id).addEventListener('input', () => {
+    document.getElementById('thresholdVal').textContent =
+      document.getElementById('threshold').value;
+    renderImport();
+  });
+});
+
+document.getElementById('btnResetCrop').addEventListener('click', resetCrop);
+
+document.getElementById('btnCancelImport').addEventListener('click', () => {
+  importPanel.classList.remove('open');
+  sourceImage = null;
+});
+
+document.getElementById('btnApply').addEventListener('click', () => {
+  pushUndo();
+  pixels = pendingPixels.slice();
+  colors = pendingColors.slice();
+  refreshAll();
+  importPanel.classList.remove('open');
+  sourceImage = null;
+  canvas.scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
+
+
+/* ============================================================
+   第十部分：匯出圖片與 JSON、自動暫存
+   ============================================================ */
+
+function download(url, filename) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  if (url.startsWith('blob:')) setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+// 產生「年月日-時分秒」的字串，例如 20260904-131500。
+function timestamp() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate())
+       + '-' + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds());
+}
+
+function exportPng(scale) {
+  const out = document.createElement('canvas');
+  out.width = COLS * scale;
+  out.height = ROWS * scale;
+  const octx = out.getContext('2d');
+  octx.fillStyle = '#000000';
+  octx.fillRect(0, 0, out.width, out.height);
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      const i = y * COLS + x;
+      if (!pixels[i]) continue;
+      octx.fillStyle = colors[i] || penColor;
+      octx.fillRect(x * scale, y * scale, scale, scale);
+    }
+  }
+  out.toBlob((blob) => {
+    download(URL.createObjectURL(blob), `marquee-96x16-${scale}x-${timestamp()}.png`);
+  }, 'image/png');
+}
+
+document.getElementById('btnPng1').addEventListener('click', () => exportPng(1));
+document.getElementById('btnPng10').addEventListener('click', () => exportPng(10));
+
+function toRowStrings() {
+  const rows = [];
+  for (let y = 0; y < ROWS; y++) {
+    let line = '';
+    for (let x = 0; x < COLS; x++) line += pixels[y * COLS + x] ? '1' : '0';
+    rows.push(line);
+  }
+  return rows;
+}
+
+// 組出要存檔的資料，「儲存 JSON」和自動暫存共用同一個格式。
+function serialize() {
+  const colorRows = [];
+  for (let y = 0; y < ROWS; y++) {
+    colorRows.push(colors.slice(y * COLS, y * COLS + COLS));
+  }
+  return {
+    width: COLS,
+    height: ROWS,
+    savedAt: new Date().toISOString(),
+    penColor: penColor,
+    palette: usedColors(),      // 這張圖用到的顏色和格數
+    pixels: toRowStrings(),     // 16 行、每行 96 個 0 或 1
+    colors: colorRows,          // 16 行、每行 96 個色碼或 null
+    patterns: patterns          // 存起來的圖案
+  };
+}
+
+// 把 JSON 資料讀回燈板；成功回傳 true。
+function applyData(data) {
+  if (!data || data.width !== COLS || data.height !== ROWS || !Array.isArray(data.pixels)) return false;
+
+  const nextPixels = new Uint8Array(TOTAL);
+  const nextColors = new Array(TOTAL).fill(null);
+  for (let y = 0; y < ROWS; y++) {
+    const line = String(data.pixels[y] || '');
+    const row = Array.isArray(data.colors) ? data.colors[y] : null;
+    for (let x = 0; x < COLS; x++) {
+      const i = y * COLS + x;
+      nextPixels[i] = line[x] === '1' ? 1 : 0;
+      if (!nextPixels[i]) continue;
+      // 舊版檔案可能沒有 colors 欄位，那就退而用檔案裡的畫筆顏色
+      const hex = (row && typeof row[x] === 'string') ? row[x] : (data.penColor || data.color);
+      nextColors[i] = normalizeHex(hex || penColor);
+    }
+  }
+  pixels = nextPixels;
+  colors = nextColors;
+
+  if (typeof data.penColor === 'string') setPenColor(data.penColor);
+  else if (typeof data.color === 'string') setPenColor(data.color);
+
+  patterns = Array.isArray(data.patterns)
+    ? data.patterns.filter((p) => p && Array.isArray(p.cells) && p.w > 0 && p.h > 0)
+    : [];
+  selection = null;
+
+  updateSelectionUI();
+  renderPatterns();
+  refreshAll();
+  return true;
+}
+
+document.getElementById('btnJson').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(serialize(), null, 2)], { type: 'application/json' });
+  download(URL.createObjectURL(blob), `marquee-96x16-${timestamp()}.json`);
+});
+
+document.getElementById('btnLoad').addEventListener('click', () => {
+  document.getElementById('fileInput').click();
+});
+
+document.getElementById('fileInput').addEventListener('change', (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try {
+      data = JSON.parse(reader.result);
+    } catch (err) {
+      alert('這個檔案不是有效的 JSON，沒有讀進來。');
+      return;
+    }
+    pushUndo();
+    if (!applyData(data)) {
+      undoStack.pop();
+      alert('這個檔案的尺寸不是 96 × 16，沒有讀進來。');
+      return;
+    }
+    setStatus(`已讀取 ${file.name}`);
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+});
+
+// 自動暫存在這個瀏覽器的 localStorage；無痕模式或空間不足時就安靜略過。
+let autosaveTimer = null;
+function scheduleAutosave() {
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(() => {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(serialize())); } catch (err) {}
+  }, 400);
+}
+
+// 讀回暫存的作品；暫存是空白燈板（例如只打開過頁面）就當作沒有，回傳 false。
+function restoreAutosave() {
+  try {
+    const data = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    const hasDrawing = data && Array.isArray(data.pixels) && data.pixels.some((row) => String(row).includes('1'));
+    const hasPatterns = data && Array.isArray(data.patterns) && data.patterns.length > 0;
+    if (!hasDrawing && !hasPatterns) return false;
+    return applyData(data);
+  } catch (err) {
+    return false;
+  }
+}
+
+// 第一次打開（沒有暫存）時，載入預設作品 default-artwork.json。
+// 直接用 file:// 開啟時瀏覽器不允許讀檔，就維持空白燈板。
+async function loadDefaultArtwork() {
+  try {
+    const res = await fetch('default-artwork.json', { cache: 'no-cache' });
+    return res.ok && applyData(await res.json());
+  } catch (err) {
+    return false;
+  }
+}
+
+// 「載入預設作品」按鈕：燈板上的點可以用「復原」找回來，但圖案清單會被換掉，所以先確認。
+document.getElementById('btnDefault').addEventListener('click', async () => {
+  const hasWork = pixels.some((v) => v) || patterns.length > 0;
+  if (hasWork && !confirm('載入預設作品會取代目前的畫面和圖案清單，確定嗎？\n（燈板上的點之後可以按「復原」找回來）')) return;
+  pushUndo();
+  if (await loadDefaultArtwork()) {
+    setStatus('已載入預設作品');
+  } else {
+    undoStack.pop();
+    setStatus('預設作品讀取失敗，請確認網路連線');
+  }
+});
+
+
+/* ============================================================
+   第十一部分：啟動
+   ============================================================ */
+setPenColor(penColor);
+if (!restoreAutosave()) loadDefaultArtwork();
+fitWidth();
+renderSwatches();
+renderPatterns();
+updateSelectionUI();
+</script>
+</body>
+</html>
